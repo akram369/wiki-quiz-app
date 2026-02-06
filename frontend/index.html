@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Wiki Quiz App</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<h1>🧠 Wiki Quiz App</h1>
+
+<div class="tabs">
+  <button class="active" onclick="showTab('generate', this)">Generate Quiz</button>
+  <button onclick="showTab('history', this)">Past Quizzes</button>
+</div>
+
+<!-- TAB 1 -->
+<div id="generate" class="tab">
+  <div class="input-row">
+    <input id="wikiUrl" placeholder="Enter Wikipedia URL" />
+    <button onclick="generateQuiz()">Generate Quiz</button>
+  </div>
+  <div id="quizResult"></div>
+</div>
+
+<!-- TAB 2 -->
+<div id="history" class="tab hidden">
+  <table>
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>URL</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="historyTable"></tbody>
+  </table>
+</div>
+
+<!-- MODAL -->
+<div id="modal" class="modal hidden">
+  <div class="modal-content">
+    <span class="close" onclick="closeModal()">×</span>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
