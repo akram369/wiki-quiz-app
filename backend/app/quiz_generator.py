@@ -1,62 +1,62 @@
 import json
-from google.generativeai import GenerativeModel
-from google.api_core.exceptions import ResourceExhausted
+import os
+import re
+import google.generativeai as genai
 
-MODEL = GenerativeModel("gemini-2.0-flash")
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 
 def generate_quiz(title: str, summary: str):
     prompt = f"""
-Generate 5 quiz questions based ONLY on the content below.
+You are an expert quiz designer.
 
-Return ONLY valid JSON in this format:
+Create EXACTLY 5 DISTINCT multiple-choice questions
+based ONLY on the article summary below.
+
+CRITICAL RULES:
+- Each question must test a DIFFERENT fact
+- DO NOT repeat or rephrase the same question
+- Cover different aspects (life, work, impact, institutions, legacy)
+- Each question must have 4 options
+- Only ONE option must be correct
+- Difficulty should vary (easy, medium, hard)
+- Explanations must reference a unique fact
+
+Return ONLY valid JSON in the following format:
+
 {{
   "quiz": [
     {{
-      "question": "",
+      "question": "...",
       "options": ["A", "B", "C", "D"],
-      "answer": "",
-      "difficulty": "easy|medium|hard",
-      "explanation": ""
+      "answer": "...",
+      "difficulty": "easy | medium | hard",
+      "explanation": "..."
     }}
   ],
-  "related_topics": []
+  "related_topics": ["topic1", "topic2", "topic3"]
 }}
 
-Title: {title}
-Summary: {summary}
+Article Title:
+{title}
+
+Article Summary:
+{summary}
 """
 
+    response = model.generate_content(prompt)
+    text = response.text.strip()
+
+    # Remove markdown if present
+    text = re.sub(r"```json|```", "", text).strip()
+
     try:
-        response = MODEL.generate_content(prompt)
-        data = json.loads(response.text)
-        return data["quiz"], data["related_topics"]
-
-    except ResourceExhausted:
-        # ✅ FALLBACK (NO LLM)
-        return fallback_quiz(title, summary)
-
-
-def fallback_quiz(title: str, summary: str):
-    quiz = [
-        {
-            "question": f"What is {title} best known for?",
-            "options": [
-                "Scientific research",
-                "Mathematical contributions",
-                "Historical importance",
-                "All of the above"
-            ],
-            "answer": "All of the above",
-            "difficulty": "easy",
-            "explanation": "Based on the article summary."
-        }
-    ] * 5
-
-    related_topics = [
-        f"History of {title}",
-        f"{title} contributions",
-        "Computer science history"
-    ]
-
-    return quiz, related_topics
+        data = json.loads(text)
+        quiz = data.get("quiz", [])
+        related_topics = data.get("related_topics", [])
+        return quiz, related_topics
+    except Exception:
+        # Safe fallback to prevent frontend crash
+        return [], []
