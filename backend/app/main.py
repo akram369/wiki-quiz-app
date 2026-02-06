@@ -15,35 +15,62 @@ from .crud import (
 from .dependencies import get_db
 from .quiz_generator import generate_quiz
 
-# Create tables
-Base.metadata.create_all(bind=engine)
+# =========================
+# APP INIT
+# =========================
+app = FastAPI(
+    title="Wiki Quiz API",
+    version="1.0.0",
+    description="Generate quizzes from Wikipedia articles using LLMs"
+)
 
-app = FastAPI(title="Wiki Quiz API")
-
-# ✅ CORS FIX
+# =========================
+# CORS (Frontend + GH Pages)
+# =========================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # allow frontend (file://, localhost, etc.)
+    allow_origins=["*"],  # OK for assignment/demo
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# =========================
+# DB TABLES (SAFE ON START)
+# =========================
+Base.metadata.create_all(bind=engine)
+
+# =========================
+# HEALTH CHECK
+# =========================
 @app.get("/")
 def root():
     return {"status": "Wiki Quiz API running"}
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
+# =========================
+# GENERATE QUIZ
+# =========================
 @app.post("/quiz/generate")
-def generate_quiz_api(url: str, db: Session = Depends(get_db)):
-
+def generate_quiz_api(
+    url: str,
+    db: Session = Depends(get_db)
+):
     if "wikipedia.org/wiki/" not in url:
-        raise HTTPException(status_code=400, detail="Invalid Wikipedia URL")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid Wikipedia URL"
+        )
 
+    # ---------- CACHE ----------
     cached_article = get_article_by_url(db, url)
 
     if cached_article:
-        if not cached_article.summary.strip():
+        # Repair old rows with empty summary
+        if not cached_article.summary or not cached_article.summary.strip():
             scraped = scrape_wikipedia(url)
             cached_article.summary = scraped["summary"]
             cached_article.sections = scraped["sections"]
@@ -80,6 +107,7 @@ def generate_quiz_api(url: str, db: Session = Depends(get_db)):
             "cached": False
         }
 
+    # ---------- NEW ARTICLE ----------
     scraped = scrape_wikipedia(url)
 
     article = create_article(db, {
@@ -107,7 +135,9 @@ def generate_quiz_api(url: str, db: Session = Depends(get_db)):
         "cached": False
     }
 
-
+# =========================
+# QUIZ HISTORY
+# =========================
 @app.get("/quiz/history")
 def quiz_history(db: Session = Depends(get_db)):
     articles = get_all_articles(db)
