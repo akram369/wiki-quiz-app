@@ -9,21 +9,50 @@ function showTab(tab, btn) {
   document.querySelectorAll(".tabs button").forEach(b => b.classList.remove("active"));
   document.getElementById(tab).classList.remove("hidden");
   btn.classList.add("active");
+
   if (tab === "history") loadHistory();
 }
 
 /* ---------- GENERATE QUIZ ---------- */
 async function generateQuiz() {
-  const url = document.getElementById("wikiUrl").value;
-  if (!url) return alert("Enter Wikipedia URL");
+  const url = document.getElementById("wikiUrl").value.trim();
+  const resultDiv = document.getElementById("quizResult");
 
-  const res = await fetch(
-    `${API}/quiz/generate?url=${encodeURIComponent(url)}`,
-    { method: "POST" }
-  );
+  if (!url) {
+    alert("Enter a Wikipedia URL");
+    return;
+  }
 
-  const data = await res.json();
-  renderQuiz(data, "quizResult");
+  resultDiv.innerHTML = "<p>⏳ Generating quiz, please wait...</p>";
+
+  try {
+    const res = await fetch(
+      `${API}/quiz/generate?url=${encodeURIComponent(url)}`,
+      { method: "POST" }
+    );
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`API Error ${res.status}: ${text}`);
+    }
+
+    const data = await res.json();
+
+    if (!data.quiz || data.quiz.length === 0) {
+      throw new Error("No quiz data returned from API");
+    }
+
+    renderQuiz(data, "quizResult");
+
+  } catch (err) {
+    console.error(err);
+    resultDiv.innerHTML = `
+      <p style="color:red;">
+        ❌ Failed to generate quiz.<br>
+        ${err.message}
+      </p>
+    `;
+  }
 }
 
 /* ---------- RENDER QUIZ ---------- */
@@ -81,7 +110,6 @@ function submitQuiz() {
     if (selected && selected.value === q.answer) score++;
   });
 
-  // reveal answers
   document.querySelectorAll(".answer").forEach(a =>
     a.classList.remove("hidden")
   );
@@ -89,40 +117,50 @@ function submitQuiz() {
   document.getElementById("scoreBox").innerHTML =
     `<h3>🎯 Your Score: ${score} / ${CURRENT_QUIZ.length}</h3>`;
 
-  // disable resubmission
   document.getElementById("submitBtn").disabled = true;
 }
 
 /* ---------- HISTORY ---------- */
 async function loadHistory() {
-  const res = await fetch(`${API}/quiz/history`);
-  const data = await res.json();
-
   const table = document.getElementById("historyTable");
-  table.innerHTML = "";
+  table.innerHTML = "<tr><td colspan='3'>Loading...</td></tr>";
 
-  data.forEach(a => {
-    table.innerHTML += `
-      <tr>
-        <td>${a.title}</td>
-        <td><a href="${a.url}" target="_blank">Link</a></td>
-        <td>
-          <button onclick="viewDetails('${a.url}')">Details</button>
-        </td>
-      </tr>
-    `;
-  });
+  try {
+    const res = await fetch(`${API}/quiz/history`);
+    const data = await res.json();
+
+    table.innerHTML = "";
+
+    data.forEach(a => {
+      table.innerHTML += `
+        <tr>
+          <td>${a.title}</td>
+          <td><a href="${a.url}" target="_blank">Link</a></td>
+          <td>
+            <button onclick="viewDetails('${a.url}')">Details</button>
+          </td>
+        </tr>
+      `;
+    });
+
+  } catch (err) {
+    table.innerHTML = "<tr><td colspan='3'>Failed to load history</td></tr>";
+  }
 }
 
 /* ---------- MODAL ---------- */
 async function viewDetails(url) {
-  const res = await fetch(
-    `${API}/quiz/generate?url=${encodeURIComponent(url)}`,
-    { method: "POST" }
-  );
-  const data = await res.json();
-  renderQuiz(data, "modalBody");
-  document.getElementById("modal").classList.remove("hidden");
+  try {
+    const res = await fetch(
+      `${API}/quiz/generate?url=${encodeURIComponent(url)}`,
+      { method: "POST" }
+    );
+    const data = await res.json();
+    renderQuiz(data, "modalBody");
+    document.getElementById("modal").classList.remove("hidden");
+  } catch {
+    alert("Failed to load quiz details");
+  }
 }
 
 function closeModal() {
